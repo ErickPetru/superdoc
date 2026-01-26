@@ -2701,9 +2701,13 @@ async function measureTableBlock(block: TableBlock, constraints: MeasureConstrai
 
         contentHeight += blockHeight;
 
-        // Add paragraph spacing.after to content height for all paragraphs.
+        // Add paragraph spacing.after/spacing.before to content height for all paragraphs.
         // Word applies spacing.after even to the last paragraph in a cell, creating space at the bottom.
         if (block.kind === 'paragraph') {
+          const spacingBefore = (block as ParagraphBlock).attrs?.spacing?.before;
+          if (typeof spacingBefore === 'number' && spacingBefore > 0) {
+            contentHeight += spacingBefore;
+          }
           const spacingAfter = (block as ParagraphBlock).attrs?.spacing?.after;
           if (typeof spacingAfter === 'number' && spacingAfter > 0) {
             contentHeight += spacingAfter;
