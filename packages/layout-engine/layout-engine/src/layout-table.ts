@@ -317,6 +317,7 @@ function calculateFragmentHeight(
   fragment: Pick<TableFragment, 'fromRow' | 'toRow' | 'repeatHeaderCount'>,
   measure: TableMeasure,
   _headerCount: number,
+  borderCollapse?: 'collapse' | 'separate',
 ): number {
   let height = 0;
   let rowCount = 0;
@@ -337,7 +338,8 @@ function calculateFragmentHeight(
   if (rowCount > 0 && cellSpacingPx > 0) {
     height += (rowCount + 1) * cellSpacingPx;
   }
-  if (rowCount > 0 && measure.tableBorderWidths) {
+  // Only add outer border height when border-collapse is separate (DOM paints container-level borders only then)
+  if (rowCount > 0 && measure.tableBorderWidths && borderCollapse === 'separate') {
     const borderWidthV = measure.tableBorderWidths.top + measure.tableBorderWidths.bottom;
     height += borderWidthV;
   }
@@ -348,9 +350,14 @@ function calculateFragmentHeight(
 /**
  * Height of a body-only fragment (rows fromRow..toRow) including vertical spacing and borders.
  * Must match the body portion of calculateFragmentHeight so findSplitPoint's fit check
- * agrees with the actual rendered fragment height.
+ * agrees with the actual rendered fragment height. Borders only included when borderCollapse === 'separate'.
  */
-function calculateBodyFragmentHeight(measure: TableMeasure, fromRow: number, toRow: number): number {
+function calculateBodyFragmentHeight(
+  measure: TableMeasure,
+  fromRow: number,
+  toRow: number,
+  borderCollapse?: 'collapse' | 'separate',
+): number {
   const rowCount = toRow - fromRow;
   if (rowCount <= 0) {
     return 0;
@@ -360,7 +367,7 @@ function calculateBodyFragmentHeight(measure: TableMeasure, fromRow: number, toR
   if (cellSpacingPx > 0) {
     height += (rowCount + 1) * cellSpacingPx;
   }
-  if (measure.tableBorderWidths) {
+  if (measure.tableBorderWidths && borderCollapse === 'separate') {
     height += measure.tableBorderWidths.top + measure.tableBorderWidths.bottom;
   }
   return height;
@@ -932,6 +939,7 @@ function findSplitPoint(
   _pendingPartialRow?: PartialRowInfo | null,
 ): SplitPointResult {
   let lastFitRow = startRow; // Last row that fit completely (exclusive end index)
+  const borderCollapse = block.attrs?.borderCollapse ?? (block.attrs?.cellSpacing != null ? 'separate' : 'collapse');
 
   // Rowspan-aware splitting: track the farthest row reached by any active rowspan
   // and the last boundary where no rowspan crosses (a "clean" break point).
@@ -960,7 +968,7 @@ function findSplitPoint(
     }
 
     // Check if this row fits: use full fragment height (rows + spacing + borders) so pagination matches render
-    const fragmentHeightWithRow = calculateBodyFragmentHeight(measure, startRow, i + 1);
+    const fragmentHeightWithRow = calculateBodyFragmentHeight(measure, startRow, i + 1, borderCollapse);
     if (fragmentHeightWithRow <= availableHeight) {
       // Row fits completely
       lastFitRow = i + 1; // Next row index (exclusive)
@@ -971,7 +979,8 @@ function findSplitPoint(
       }
     } else {
       // Row doesn't fit completely; remaining space after last full row set
-      const remainingHeight = availableHeight - calculateBodyFragmentHeight(measure, startRow, lastFitRow);
+      const remainingHeight =
+        availableHeight - calculateBodyFragmentHeight(measure, startRow, lastFitRow, borderCollapse);
 
       // Check if this is an over-tall row (exceeds full page height) - force split regardless of cantSplit
       // This handles edge case where a row is taller than an entire page
@@ -1239,6 +1248,9 @@ export function layoutTableBlock({
     return;
   }
 
+  // Resolve border-collapse for fragment height (match measuring/render: only add borders when separate)
+  const borderCollapse = block.attrs?.borderCollapse ?? (block.attrs?.cellSpacing != null ? 'separate' : 'collapse');
+
   // 4. Loop until all rows processed (including pending partial rows)
   while (currentRow < block.rows.length || pendingPartialRow !== null) {
     state = ensurePage();
@@ -1425,6 +1437,7 @@ export function layoutTableBlock({
         { fromRow: bodyStartRow, toRow: endRow, repeatHeaderCount },
         measure,
         headerCount,
+        borderCollapse,
       );
     }
 
