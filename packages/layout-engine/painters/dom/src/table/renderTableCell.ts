@@ -730,7 +730,6 @@ export const renderTableCell = (deps: TableCellRenderDependencies): TableCellRen
 
     const contentWidthPx = Math.max(0, cellMeasure.width - paddingLeft - paddingRight);
     const contentHeightPx = Math.max(0, rowHeight - paddingTop - paddingBottom);
-    const paragraphTopById = new Map<string, number>();
     let flowCursorY = 0;
     const anchoredBlocks: Array<{ block: ImageBlock | DrawingBlock; measure: ImageMeasure | DrawingMeasure }> = [];
     const renderedLines: RenderedLineInfo[] = [];
@@ -931,7 +930,6 @@ export const renderTableCell = (deps: TableCellRenderDependencies): TableCellRen
           paraWrapper.style.marginTop = `${spacingBefore}px`;
           flowCursorY += spacingBefore;
         }
-        paragraphTopById.set(block.id, flowCursorY);
 
         // Calculate height of rendered content for proper block accumulation
         let renderedHeight = 0;
