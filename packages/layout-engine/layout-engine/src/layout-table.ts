@@ -345,6 +345,27 @@ function calculateFragmentHeight(
   return height;
 }
 
+/**
+ * Height of a body-only fragment (rows fromRow..toRow) including vertical spacing and borders.
+ * Must match the body portion of calculateFragmentHeight so findSplitPoint's fit check
+ * agrees with the actual rendered fragment height.
+ */
+function calculateBodyFragmentHeight(measure: TableMeasure, fromRow: number, toRow: number): number {
+  const rowCount = toRow - fromRow;
+  if (rowCount <= 0) {
+    return 0;
+  }
+  let height = sumRowHeights(measure.rows, fromRow, toRow);
+  const cellSpacingPx = measure.cellSpacingPx ?? 0;
+  if (cellSpacingPx > 0) {
+    height += (rowCount + 1) * cellSpacingPx;
+  }
+  if (measure.tableBorderWidths) {
+    height += measure.tableBorderWidths.top + measure.tableBorderWidths.bottom;
+  }
+  return height;
+}
+
 type SplitPointResult = {
   endRow: number; // Exclusive row index (next row after last included)
   partialRow: PartialRowInfo | null; // Null for row-boundary splits, PartialRowInfo for mid-row splits
@@ -910,8 +931,7 @@ function findSplitPoint(
   fullPageHeight?: number,
   _pendingPartialRow?: PartialRowInfo | null,
 ): SplitPointResult {
-  let accumulatedHeight = 0;
-  let lastFitRow = startRow; // Last row that fit completely
+  let lastFitRow = startRow; // Last row that fit completely (exclusive end index)
 
   // Rowspan-aware splitting: track the farthest row reached by any active rowspan
   // and the last boundary where no rowspan crosses (a "clean" break point).
@@ -939,10 +959,10 @@ function findSplitPoint(
       }
     }
 
-    // Check if this row fits completely
-    if (accumulatedHeight + rowHeight <= availableHeight) {
+    // Check if this row fits: use full fragment height (rows + spacing + borders) so pagination matches render
+    const fragmentHeightWithRow = calculateBodyFragmentHeight(measure, startRow, i + 1);
+    if (fragmentHeightWithRow <= availableHeight) {
       // Row fits completely
-      accumulatedHeight += rowHeight;
       lastFitRow = i + 1; // Next row index (exclusive)
 
       // A boundary is "clean" if no active rowspan crosses it
@@ -950,8 +970,8 @@ function findSplitPoint(
         lastCleanFitRow = i + 1;
       }
     } else {
-      // Row doesn't fit completely
-      const remainingHeight = availableHeight - accumulatedHeight;
+      // Row doesn't fit completely; remaining space after last full row set
+      const remainingHeight = availableHeight - calculateBodyFragmentHeight(measure, startRow, lastFitRow);
 
       // Check if this is an over-tall row (exceeds full page height) - force split regardless of cantSplit
       // This handles edge case where a row is taller than an entire page
