@@ -978,9 +978,18 @@ function findSplitPoint(
         lastCleanFitRow = i + 1;
       }
     } else {
-      // Row doesn't fit completely; remaining space after last full row set
-      const remainingHeight =
+      // Row doesn't fit completely; remaining space after last full row set.
+      // When lastFitRow === startRow (first row doesn't fit), no rows have been placed yet, so
+      // we must subtract the vertical space that appears before the first row (top spacing + top border)
+      // instead of using calculateBodyFragmentHeight(startRow, startRow) which is 0.
+      let remainingHeight =
         availableHeight - calculateBodyFragmentHeight(measure, startRow, lastFitRow, borderCollapse);
+      if (lastFitRow === startRow) {
+        const cellSpacingPx = measure.cellSpacingPx ?? 0;
+        const topBorderPx =
+          borderCollapse === 'separate' && measure.tableBorderWidths ? measure.tableBorderWidths.top : 0;
+        remainingHeight = availableHeight - cellSpacingPx - topBorderPx;
+      }
 
       // Check if this is an over-tall row (exceeds full page height) - force split regardless of cantSplit
       // This handles edge case where a row is taller than an entire page
